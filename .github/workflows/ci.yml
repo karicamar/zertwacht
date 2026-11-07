@@ -1,0 +1,63 @@
+name: Zertwacht
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * *" # daily: certificates expire on their own schedule
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release -warnaserror
+      - run: dotnet test --no-build -c Release
+      - run: dotnet pack src/Zertwacht.Cli -c Release --no-build -o nupkg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zertwacht-nupkg
+          path: nupkg/*.nupkg
+
+  # Dogfooding: my own site must have a healthy certificate (fails 30 days before expiry).
+  monitor-portfolio:
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: dotnet run --project src/Zertwacht.Cli -c Release -- karicamar.github.io --fail-on warning --format markdown
+
+  # The badssl.com test endpoints: every broken certificate must be detected.
+  demo:
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Scan the sample list (expected to find problems)
+        run: |
+          set +e
+          dotnet run --project src/Zertwacht.Cli -c Release -- --list samples/targets.txt --format json -o result.json
+          test $? -eq 1 || exit 1
+          node -e '
+            const r = require("./result.json");
+            const codes = t => (r.certificates.find(c => c.target.startsWith(t)) || { issues: [] }).issues.map(i => i.code);
+            const want = { "expired.badssl.com": "expired", "wrong.host.badssl.com": "name-mismatch",
+                           "self-signed.badssl.com": "self-signed", "incomplete-chain.badssl.com": "untrusted-chain" };
+            let ok = true;
+            for (const [t, c] of Object.entries(want)) { const got = codes(t); console.log(t, got); if (!got.includes(c)) ok = false; }
+            if (codes("badssl.com:").length || codes("karicamar.github.io").length) ok = false;
+            process.exit(ok ? 0 : 1);'

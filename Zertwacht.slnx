@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Zertwacht.Cli/Zertwacht.Cli.csproj" />
+    <Project Path="src/Zertwacht.Core/Zertwacht.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Zertwacht.Tests/Zertwacht.Tests.csproj" />
+  </Folder>
+</Solution>

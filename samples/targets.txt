@@ -1,0 +1,11 @@
+# Zertwacht target list: one host, host:port, https:// URL or certificate file per line
+
+# My own site (GitHub Pages)
+karicamar.github.io
+
+# badssl.com: public test endpoints with deliberately broken certificates, made for testing TLS clients
+expired.badssl.com
+wrong.host.badssl.com
+self-signed.badssl.com
+incomplete-chain.badssl.com
+badssl.com
